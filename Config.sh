@@ -1232,6 +1232,177 @@ configure_music_signature() {
         break
     done
 }
+
+configure_webui() {
+    local config_file="$CONFIG_DIR/webui.json"
+    local temp_file=$(mktemp) || { echo "无法创建临时文件"; exit 1; }
+    local jq_stderr_file=$(mktemp) # 用于捕获 jq 错误
+    # 确保临时文件和错误文件在退出时被删除
+    trap 'rm -f "$temp_file" "$jq_stderr_file"' EXIT
+
+    # --- 读取当前配置或设置默认值 ---
+    local current_host="0.0.0.0"
+    local current_port="6099"
+    local current_token="napcat"
+    local current_login_rate="5"
+    local current_prefix="" # prefix 字段也读取一下，虽然不在表单里，但更新时要保留
+
+    # 检查配置文件是否存在且可读，如果存在则读取
+    if [[ -f "$config_file" ]] && [[ -r "$config_file" ]]; then
+        # 使用 jq 一次性读取所有值，减少文件读取次数
+        local current_config=$(jq -c '.' "$config_file" 2>/dev/null)
+        if [[ -n "$current_config" ]] && [[ "$current_config" != "null" ]]; then
+            current_host=$(echo "$current_config" | jq -r '.host // "0.0.0.0"')
+            current_port=$(echo "$current_config" | jq -r '.port // "6099"')
+            current_token=$(echo "$current_config" | jq -r '.token // "napcat"')
+            current_login_rate=$(echo "$current_config" | jq -r '.loginRate // "5"')
+            current_prefix=$(echo "$current_config" | jq -r '.prefix // ""')
+        fi
+    else
+        # 如果文件不存在，首次配置时提示一下
+        dialog --colors --infobox "WebUI 配置文件 '$config_file' 不存在，将使用默认值创建。" 5 60
+        sleep 2 # 短暂显示提示
+    fi
+
+
+    local form_values
+    while true; do
+        # --- 显示表单 ---
+        exec 3>&1
+        form_values=$(dialog --colors --clear --backtitle "WebUI 配置" \
+            --title "配置 WebUI" \
+            --form "请填写以下信息 (所有项均为必填):" 18 70 0 \
+            "Host:"        1 1 "$current_host"        1 15 40 0 \
+            "Port:"        2 1 "$current_port"        2 15 40 0 \
+            "Token:"       3 1 "$current_token"       3 15 40 0 \
+            "Login Rate:"  4 1 "$current_login_rate"  4 15 40 0 \
+        2>&1 1>&3)
+        local form_exit_status=$?
+        exec 3>&-
+        clear
+
+        if [[ $form_exit_status -ne 0 ]]; then
+            dialog --colors --msgbox "操作已取消。" 6 40
+            return 1
+        fi
+
+        # 解析表单输入
+        local host=$(echo "$form_values" | sed -n '1p')
+        local port=$(echo "$form_values" | sed -n '2p')
+        local token=$(echo "$form_values" | sed -n '3p')
+        local login_rate=$(echo "$form_values" | sed -n '4p')
+
+        # --- 输入验证 ---
+        local errors=()
+        local ipv4_regex='^((25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$'
+
+        # 必填项检查
+        [[ -z "$host" ]] && errors+=("Host 不能为空")
+        [[ -z "$port" ]] && errors+=("Port 不能为空")
+        [[ -z "$token" ]] && errors+=("Token 不能为空")
+        [[ -z "$login_rate" ]] && errors+=("Login Rate 不能为空")
+
+        # Host 格式检查
+        if [[ -n "$host" ]]; then
+            if [[ "$host" == "localhost" ]]; then
+                host="0.0.0.0" # 替换 localhost
+            elif ! [[ "$host" =~ $ipv4_regex ]]; then
+                 errors+=("Host '$host' 不是有效的 IPv4 地址格式")
+            fi
+        fi
+
+        # Port 格式和范围检查
+        if [[ -n "$port" ]] && ! [[ "$port" =~ ^[0-9]+$ ]] || [[ "$port" -lt 1 ]] || [[ "$port" -gt 65535 ]]; then
+            errors+=("Port '$port' 必须是 1-65535 之间的数字")
+        fi
+
+        # Login Rate 格式检查 (必须是数字)
+        if [[ -n "$login_rate" ]] && ! [[ "$login_rate" =~ ^[0-9]+$ ]]; then
+             errors+=("Login Rate '$login_rate' 必须是数字")
+        fi
+
+        # 端口占用检查 (仅在 Port 有效时进行)
+        if [[ "$port" =~ ^[0-9]+$ ]] && [[ "$port" -ge 1 ]] && [[ "$port" -le 65535 ]]; then
+            # 检查 TCP 监听端口
+            if ss -tuln | grep -q ":${port}\s"; then
+                 errors+=("端口 $port 可能已被占用")
+            fi
+        fi
+
+        # --- 处理验证结果 ---
+        if [[ ${#errors[@]} -gt 0 ]]; then
+            # 错误标题用红色，错误项用黄色
+            local error_msg="${FG_RED}输入无效:${RESET}\n\n"
+            for error in "${errors[@]}"; do
+                error_msg+=" - ${FG_YELLOW}$error${RESET}\n"
+            done
+            dialog --colors --msgbox "$error_msg" 15 70
+            # 保留用户输入以便下次显示
+            current_host="$host"
+            current_port="$port"
+            current_token="$token"
+            current_login_rate="$login_rate"
+            continue # 返回循环，重新显示表单
+        fi
+
+        # --- 验证通过，准备更新 JSON ---
+        # 构建要写入的 JSON 对象，注意 port 和 loginRate 需要是数字
+        # 保留未在表单中出现的 prefix 字段
+        local new_webui_obj=$(jq -n \
+            --arg host "$host" \
+            --argjson port "$port" \
+            --arg token "$token" \
+            --argjson loginRate "$login_rate" \
+            --arg prefix "$current_prefix" \
+            '{
+                host: $host,
+                port: $port,
+                token: $token,
+                loginRate: $loginRate,
+                prefix: $prefix
+            }')
+
+
+        # --- 更新 JSON 文件 ---
+        # 直接覆盖整个文件内容
+        if echo "$new_webui_obj" | jq '.' > "$temp_file" 2> "$jq_stderr_file"; then
+            # 检查写入临时文件是否成功且内容不为空
+            if [[ -s "$temp_file" ]]; then
+                 # 备份原始文件 (可选但推荐)
+                 # cp "$config_file" "$config_file.bak"
+                 # 用临时文件覆盖原始文件
+                 if mv "$temp_file" "$config_file"; then
+                     dialog --colors --msgbox "${FG_GREEN}WebUI 配置已成功更新！${RESET}" 8 50
+                     # 成功后不再需要 trap，清理错误文件
+                     rm -f "$jq_stderr_file"
+                     trap - EXIT
+                     return 0 # 成功退出函数
+                 else
+                     dialog --colors --msgbox "${FG_RED}错误：${RESET}无法更新配置文件 '$config_file'。权限问题？" 8 60
+                     # 出错也清理错误文件
+                     rm -f "$jq_stderr_file"
+                     return 1 # 失败退出函数
+                 fi
+            else
+                 # jq 成功执行但输出了空文件
+                 local jq_error_output=$(<"$jq_stderr_file") # 读取 jq 的 stderr
+                 dialog --colors --msgbox "${FG_RED}错误：${RESET}jq 处理后生成了空文件。请检查 jq 脚本和输入。\n\nJQ 输出(空):\n\n${FG_RED}JQ 错误:${RESET}\n$jq_error_output" 15 70
+                 rm -f "$jq_stderr_file"
+                 return 1 # 失败退出函数
+            fi
+        else
+            # jq 命令执行失败
+            local jq_error_output=$(<"$jq_stderr_file") # 读取 jq 的 stderr
+            rm -f "$jq_stderr_file"
+            dialog --colors --msgbox "${FG_RED}错误：${RESET}使用 jq 更新 JSON 时出错。\n\n${FG_RED}JQ 错误:${RESET}\n$jq_error_output\n\n请检查 JSON 文件格式或 jq 命令。" 15 70
+            return 1 # 失败退出函数
+        fi
+
+        # 理论上不应执行到这里
+        break
+    done
+}
+
 # 函数：获取有效的QQ账号列表
 get_qq_accounts() {
     local accounts=()
@@ -1362,53 +1533,66 @@ add_account() {
 
 # 函数：显示网络服务配置菜单 (菜单2)
 show_service_menu() {
-    local qq_account=$1
-    local config_file="$CONFIG_DIR/onebot11_${qq_account}.json"
+    local qq_account=$1 # 虽然 WebUI 配置不直接用 qq_account，但保持函数签名一致
+    local onebot_config_file="$CONFIG_DIR/onebot11_${qq_account}.json"
+    local webui_config_file="$CONFIG_DIR/webui.json" # WebUI 配置文件路径
 
     while true; do
-        # 检查配置文件是否存在
-        if [[ ! -f "$config_file" ]] || [[ ! -r "$config_file" ]]; then
-            dialog --colors --msgbox "${FG_RED}错误：${RESET}无法读取配置文件 '$config_file'。" 8 60
+        # 检查 OneBot 配置文件是否存在
+        if [[ ! -f "$onebot_config_file" ]] || [[ ! -r "$onebot_config_file" ]]; then
+            dialog --colors --msgbox "${FG_RED}错误：${RESET}无法读取 OneBot 配置文件 '$onebot_config_file'。" 8 60
             return # 返回到账号选择菜单
         fi
 
-        # 检查各项服务的配置状态
+        # --- 检查各项服务的配置状态 ---
         local http_server_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.httpServers // []) | length' "$config_file" 2>/dev/null) -gt 0 ]]; then
+        if [[ $(jq '(.network.httpServers // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
             http_server_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
         local http_client_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.httpClients // []) | length' "$config_file" 2>/dev/null) -gt 0 ]]; then
+        if [[ $(jq '(.network.httpClients // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
             http_client_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
         local ws_server_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.websocketServers // []) | length' "$config_file" 2>/dev/null) -gt 0 ]]; then
+        if [[ $(jq '(.network.websocketServers // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
             ws_server_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
         local ws_client_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.websocketClients // []) | length' "$config_file" 2>/dev/null) -gt 0 ]]; then
+        if [[ $(jq '(.network.websocketClients // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
             ws_client_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
-        # 检查音乐签名配置状态
         local music_sig_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '.musicSignUrl // ""' "$config_file" 2>/dev/null) != '""' ]]; then
+        if [[ $(jq '.musicSignUrl // ""' "$onebot_config_file" 2>/dev/null) != '""' ]]; then
              music_sig_status="${FG_GREEN}(已配置)${RESET}"
         fi
+
+        # 检查 WebUI 配置状态
+        local webui_status="${FG_RED}(未配置)${RESET}"
+        if [[ -f "$webui_config_file" ]] && [[ -r "$webui_config_file" ]]; then
+            local webui_token=$(jq -r '.token // ""' "$webui_config_file" 2>/dev/null)
+            if [[ "$webui_token" == "napcat" ]]; then
+                webui_status="${FG_RED}(使用默认密钥，有安全隐患)${RESET}"
+            elif [[ -n "$webui_token" ]]; then # 如果 token 不是 napcat 且不为空
+                webui_status="${FG_GREEN}(已配置)${RESET}"
+            fi
+            # 如果 token 为空或文件读取失败，则保持 (未配置)
+        fi
+
 
         # 显示菜单，包含配置状态和帮助选项
         SERVICE_CHOICE=$(dialog --colors --clear --backtitle "服务配置" \
                                 --title "配置 $qq_account 的服务" \
-                                --menu "请选择要配置的项目:" 20 75 7 \
+                                --menu "请选择要配置的项目:" 20 85 7 \
                                 1 "HTTP 服务端 (正向http) ${http_server_status}" \
                                 2 "HTTP 客户端 (反向http) ${http_client_status}" \
                                 3 "WebSocket 服务端 (正向ws) ${ws_server_status}" \
                                 4 "WebSocket 客户端 (反向ws) ${ws_client_status}" \
                                 5 "音乐签名配置 ${music_sig_status}" \
-                                6 "WebUI 配置 ${FG_YELLOW}(待实现)${RESET}" \
+                                6 "WebUI 配置 ${webui_status}" \
                                 HELP "我该如何选择网络服务？" \
                                 2>&1 >/dev/tty)
 
@@ -1437,7 +1621,7 @@ show_service_menu() {
                 configure_music_signature "$qq_account" # 新增调用
                 ;;
             6)
-                dialog --colors --msgbox "${FG_YELLOW}WebUI 配置功能尚未实现。${RESET}" 6 40 # 新增占位符
+                configure_webui # 调用新的 WebUI 配置函数
                 ;;
             HELP)
                 # 定义帮助信息，使用简化颜色代码
