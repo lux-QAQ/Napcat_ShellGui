@@ -1,5 +1,46 @@
 #!/bin/bash
 
+# --- ANSI 颜色定义 (用于 echo -e) ---
+ANSI_RESET='\e[0m'
+ANSI_BOLD='\e[1m'
+ANSI_RED='\e[31m'
+ANSI_GREEN='\e[32m'
+ANSI_YELLOW='\e[33m'
+ANSI_BLUE='\e[34m'
+ANSI_MAGENTA='\e[35m'
+ANSI_CYAN='\e[36m'
+ANSI_WHITE='\e[37m'
+
+CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
+BASE_NAPCAT_CONFIG="$CONFIG_DIR/napcat.json"
+BASE_ONEBOT_CONFIG="$CONFIG_DIR/onebot11.json"
+
+# --- Root 权限检查 ---
+if [[ $EUID -ne 0 ]]; then
+   # 尝试非交互式 sudo，看是否能直接成功 (例如，已缓存密码或 NOPASSWD)
+   if sudo -n true &> /dev/null; then
+       # 可以非交互式 sudo，直接重新执行 (无提示)
+       sudo "$0" "$@"
+       exit $? # 退出当前非 root 进程, 传递 sudo 的退出码
+   else
+       # 非交互式 sudo 失败，需要密码或权限不足
+       # 现在显示提示信息
+       if command -v dialog &> /dev/null; then
+           # 使用 dialog 提示
+           dialog --colors --title "需要权限" --msgbox "${FG_YELLOW}此脚本需要 root 权限来修改 '${CONFIG_DIR}' 中的文件。\n\n将通过 sudo 请求密码以获取权限。${RESET}" 10 60 2>&1 >/dev/tty
+           clear
+       else
+           # dialog 不可用时的备用 echo 提示
+           echo "提示: 此脚本需要 root 权限才能修改位于 '${CONFIG_DIR}' 的配置文件。" >&2
+           echo "将通过 sudo 请求密码以获取权限..." >&2
+       fi
+
+       # 现在尝试交互式 sudo，这会提示输入密码
+       sudo "$0" "$@"
+       exit $? # 退出当前非 root 进程, 传递 sudo 的退出码
+   fi
+fi
+
 # 检查 dialog --colors 是否安装
 if ! command -v dialog --colors &> /dev/null; then
     echo "错误: 需要 'dialog --colors' 命令，请先安装。" >&2
@@ -21,9 +62,7 @@ if ! command -v ss &> /dev/null; then
     exit 1
 fi
 
-CONFIG_DIR="/opt/QQ/resources/app/app_launcher/napcat/config"
-BASE_NAPCAT_CONFIG="$CONFIG_DIR/napcat.json"
-BASE_ONEBOT_CONFIG="$CONFIG_DIR/onebot11.json"
+
 
 
 # --- ANSI 颜色定义 (使用 ANSI-C Quoting) ---
@@ -1648,6 +1687,59 @@ show_service_menu() {
     done
 }
 
+
+
+delete_account() {
+    local qq_account=$1
+    local napcat_file="$CONFIG_DIR/napcat_${qq_account}.json"
+    local onebot_file="$CONFIG_DIR/onebot11_${qq_account}.json"
+
+    # 确认删除对话框
+    dialog --colors --defaultno --title "确认删除账号" \
+           --yes-label "确认删除！" --no-label "取消" \
+           --yesno "${BOLD}${FG_RED}警告：删除操作不可逆！${RESET}\n\n您确定要删除账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 的所有配置文件吗？\n\n文件将被永久删除:\n- ${FG_YELLOW}${napcat_file}${RESET}\n- ${FG_YELLOW}${onebot_file}${RESET}" 20 70 2>&1 >/dev/tty
+
+    local choice=$?
+    clear
+
+    if [[ $choice -eq 0 ]]; then # 用户选择了 "确认删除！"
+        echo "正在尝试删除账号 $qq_account 的配置文件..."
+        local delete_failed=false
+        # 尝试删除 napcat 文件
+        if [[ -f "$napcat_file" ]]; then
+            if sudo rm -f "$napcat_file"; then
+                echo "已删除: $napcat_file"
+            else
+                echo "${FG_RED}错误：${RESET}删除 $napcat_file 失败。请检查权限。" >&2
+                delete_failed=true
+            fi
+        else
+            echo "文件不存在，跳过: $napcat_file"
+        fi
+        # 尝试删除 onebot 文件
+        if [[ -f "$onebot_file" ]]; then
+            if sudo rm -f "$onebot_file"; then
+                echo "已删除: $onebot_file"
+            else
+                echo "${FG_RED}错误：${RESET}删除 $onebot_file 失败。请检查权限。" >&2
+                delete_failed=true
+            fi
+        else
+            echo "文件不存在，跳过: $onebot_file"
+        fi
+
+        if $delete_failed; then
+             dialog --colors --msgbox "${FG_RED}错误：${RESET}删除过程中遇到问题。部分文件可能未被删除，请手动检查。" 8 60
+        else
+             dialog --colors --msgbox "账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 的配置文件已成功删除。" 8 50
+        fi
+        return 0 # 表示执行了删除（无论成功与否）
+    else # 用户选择了 "取消"
+        dialog --colors --msgbox "删除操作已取消。" 6 40
+        return 1 # 表示取消
+    fi
+}
+
 # --- 主逻辑 ---
 
 # 主循环，显示账号选择菜单 (菜单1)
@@ -1679,7 +1771,10 @@ while true; do
 
     CHOICE=$(dialog --colors --clear --backtitle "QQ账号管理" \
                     --title "选择QQ账号" \
-                    --menu "请选择一个账号进行服务配置，或添加新账号:" \
+                    --ok-label "配置服务" \
+                    --cancel-label "退出" \
+                    --extra-button --extra-label "删除账号" \
+                    --menu "请选择账号进行操作，或添加新账号:" \
                     "$menu_height" 55 "$list_height" \
                     "${MENU_ITEMS[@]}" \
                     2>&1 >/dev/tty)
@@ -1687,35 +1782,82 @@ while true; do
     exit_status=$?
     clear
 
-    # 用户按了取消或ESC，退出脚本
-    if [[ $exit_status -ne 0 ]]; then
-        echo "操作已取消或退出。"
-        break
-    fi
+    # 删除或注释掉下面这几行
+    # if [[ $exit_status -ne 0 ]]; then
+    #     echo "操作已取消或退出。"
+    #     break
+    # fi
 
-    case "$CHOICE" in
-        ADD)
-            add_account
-            # 添加后，循环会自动重新开始，刷新列表
+    case $exit_status in
+        0) # OK (配置服务)
+            case "$CHOICE" in
+                ADD)
+                    # 调用添加函数
+                    add_account
+                    ;;
+                *)
+                    # 检查选择的是否是有效的账号
+                    is_valid_account=false
+                    for acc in "${ACCOUNTS_LIST[@]}"; do
+                        if [[ "$CHOICE" == "$acc" ]]; then
+                            is_valid_account=true
+                            break
+                        fi
+                    done
+
+                    if $is_valid_account; then
+                        # 进入菜单2
+                        show_service_menu "$CHOICE"
+                    else
+                         # 如果列表为空时按 OK，CHOICE 可能为空
+                         if [[ -z "$CHOICE" ]] && [[ ${#ACCOUNTS_LIST[@]} -eq 0 ]]; then
+                             dialog --colors --msgbox "当前没有可配置的账号，请先添加。" 6 50
+                         else
+                             dialog --colors --msgbox "出现意外错误，无效的选择: '$CHOICE'" 6 40
+                         fi
+                    fi
+                    ;;
+            esac
             ;;
-        *)
-            # 检查选择的是否是有效的账号
-            is_valid_account=false
-            for acc in "${ACCOUNTS_LIST[@]}"; do
-                if [[ "$CHOICE" == "$acc" ]]; then
-                    is_valid_account=true
-                    break
-                fi
-            done
+        1) # Cancel (退出)
+            echo "操作已取消或退出。"
+            break # 退出主循环
+            ;;
+        3) # Extra button (删除账号)
+            case "$CHOICE" in
+                ADD)
+                    dialog --colors --msgbox "无法删除 '添加新账号' 选项。\n请先在列表中选择一个要删除的账号。" 8 50
+                    ;;
+                *)
+                    # 检查选择的是否是有效的账号
+                    is_valid_account=false
+                    for acc in "${ACCOUNTS_LIST[@]}"; do
+                        if [[ "$CHOICE" == "$acc" ]]; then
+                            is_valid_account=true
+                            break
+                        fi
+                    done
 
-            if $is_valid_account; then
-                # 进入菜单2
-                show_service_menu "$CHOICE"
-                # 从菜单2返回后，循环继续，回到账号选择菜单
-            else
-                 # 这通常不应该发生，因为dialog --colors只返回菜单中的有效项
-                 dialog --colors --msgbox "出现意外错误，无效的选择: $CHOICE" 6 40
-            fi
+                    if $is_valid_account; then
+                        # 调用删除函数
+                        delete_account "$CHOICE"
+                        # 删除后，循环会自动重新开始，刷新列表
+                    else
+                         # 如果列表为空时按删除，CHOICE 可能为空
+                         if [[ -z "$CHOICE" ]] && [[ ${#ACCOUNTS_LIST[@]} -eq 0 ]]; then
+                             dialog --colors --msgbox "当前没有可删除的账号。" 6 40
+                         else
+                             # 可能是在空列表时按了删除按钮
+                             dialog --colors --msgbox "请先在列表中选择一个要删除的账号。" 6 50
+                         fi
+                    fi
+                    ;;
+            esac
+            # 注意：这里不需要 break，让循环继续以刷新列表
+            ;;
+        *) # Other (ESC etc.)
+            echo "操作已取消或发生未知错误 (退出码: $exit_status)。"
+            break # 退出主循环
             ;;
     esac
 done
