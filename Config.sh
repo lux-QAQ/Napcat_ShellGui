@@ -1575,7 +1575,7 @@ show_service_menu() {
         if [[ -f "$webui_config_file" ]] && [[ -r "$webui_config_file" ]]; then
             local webui_token=$(jq -r '.token // ""' "$webui_config_file" 2>/dev/null)
             if [[ "$webui_token" == "napcat" ]]; then
-                webui_status="${FG_RED}(使用默认密钥，有安全隐患)${RESET}"
+                webui_status="${FG_RED}(使用默认token，有安全隐患)${RESET}"
             elif [[ -n "$webui_token" ]]; then # 如果 token 不是 napcat 且不为空
                 webui_status="${FG_GREEN}(已配置)${RESET}"
             fi
