@@ -1,0 +1,1 @@
+调试日志将写入: /tmp/qqbot_gui_debug_1746031260.log

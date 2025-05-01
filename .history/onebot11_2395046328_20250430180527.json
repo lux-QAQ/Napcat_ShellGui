@@ -1,0 +1,52 @@
+{
+  "http": {
+    "enable": false,
+    "host": "",
+    "port": 3000,
+    "secret": "",
+    "enableHeart": false,
+    "enablePost": false,
+    "postUrls": []
+  },
+  "ws": {
+    "enable": false,
+    "host": "",
+    "port": 3001
+  },
+  "reverseWs": {
+    "enable": false,
+    "urls": []
+  },
+  "GroupLocalTime": {
+    "Record": false,
+    "RecordList": []
+  },
+  "debug": false,
+  "heartInterval": 30000,
+  "messagePostFormat": "array",
+  "enableLocalFile2Url": true,
+  "musicSignUrl": "",
+  "reportSelfMessage": false,
+  "token": "",
+  "network": {
+    "httpServers": [
+      {
+        "enable": true,
+        "name": "11",
+        "host": "0.0.0.0",
+        "port": 3000,
+        "enableCors": true,
+        "enableWebsocket": true,
+        "messagePostFormat": "array",
+        "token": "",
+        "debug": false
+      }
+    ],
+    "httpSseServers": [],
+    "httpClients": [],
+    "websocketServers": [],
+    "websocketClients": [],
+    "plugins": []
+  },
+  "parseMultMsg": false
+}

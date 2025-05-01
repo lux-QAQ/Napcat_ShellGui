@@ -1,0 +1,5 @@
+curl
+(json)
+dialog
+sudo
+pgrep(不需要安装)
