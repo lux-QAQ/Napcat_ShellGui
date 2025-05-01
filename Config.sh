@@ -1091,7 +1091,147 @@ configure_reverse_ws_client() {
         break # 避免死循环
     done
 }
+configure_music_signature() {
+    local qq_account=$1
+    local config_file="$CONFIG_DIR/onebot11_${qq_account}.json"
+    local temp_file=$(mktemp) || { echo "无法创建临时文件"; exit 1; }
+    local jq_stderr_file=$(mktemp) # 用于捕获 jq 错误
+    # 确保临时文件和错误文件在退出时被删除
+    trap 'rm -f "$temp_file" "$jq_stderr_file"' EXIT
 
+    # 检查配置文件是否存在且可读
+    if [[ ! -f "$config_file" ]] || [[ ! -r "$config_file" ]]; then
+        dialog --colors --msgbox "${FG_RED}错误：${RESET}无法读取配置文件 '$config_file'。" 8 60
+        return 1
+    fi
+
+    # --- 读取当前配置或设置默认值 ---
+    # 注意：这些字段在 JSON 的根级别
+    local current_music_url=$(jq -r '.musicSignUrl // ""' "$config_file")
+    local current_enable_local_file="on" # 默认开启
+    [[ $(jq -r '.enableLocalFile2Url // true' "$config_file") == "false" ]] && current_enable_local_file="off"
+    local current_parse_mult_msg="off" # 默认关闭
+    [[ $(jq -r '.parseMultMsg // false' "$config_file") == "true" ]] && current_parse_mult_msg="on"
+
+    local form_values
+    while true; do
+        # --- 显示表单 ---
+        # 1. 输入框部分
+        exec 3>&1
+        form_values=$(dialog --colors --clear --backtitle "音乐签名配置" \
+            --title "配置音乐签名 - $qq_account" \
+            --form "请填写以下信息 (带 * 为必填):" 15 70 0 \
+            "音乐签名地址 (*):" 1 1 "$current_music_url" 1 20 60 0 \
+        2>&1 1>&3)
+        local form_exit_status=$?
+        exec 3>&-
+        clear
+
+        if [[ $form_exit_status -ne 0 ]]; then
+            dialog --colors --msgbox "操作已取消。" 6 40
+            return 1
+        fi
+
+        # 解析表单输入
+        local music_url=$(echo "$form_values" | sed -n '1p')
+
+        # 2. 开关选择
+        exec 3>&1
+        local checklist_choices=$(dialog --colors --clear --backtitle "音乐签名配置" \
+            --title "启用选项 - $qq_account" \
+            --checklist "请选择要启用的选项:" 15 60 2 \
+            "enable_local" "启用本地文件到URL" "$current_enable_local_file" \
+            "parse_mult"   "启用上报解析合并消息" "$current_parse_mult_msg" \
+        2>&1 1>&3)
+        local check_exit_status=$?
+        exec 3>&-
+        clear
+
+        if [[ $check_exit_status -ne 0 ]]; then
+            dialog --colors --msgbox "操作已取消。" 6 40
+            return 1
+        fi
+
+        # 解析 checklist 输出
+        local enable_local=false; [[ "$checklist_choices" == *enable_local* ]] && enable_local=true
+        local parse_mult=false;   [[ "$checklist_choices" == *parse_mult* ]] && parse_mult=true
+
+        # --- 输入验证 ---
+        local errors=()
+        # URL 验证正则表达式 (Perl 兼容)
+        local url_regex='\b(([\w-]+://?|www[.])[^\s()<>]+(?:\([\w\d]+\)|([^[:punct:]\s]|/)))'
+
+        # 必填项检查
+        [[ -z "$music_url" ]] && errors+=("音乐签名地址不能为空")
+
+        # Url 格式检查
+        if [[ -n "$music_url" ]] && ! echo "$music_url" | grep -Pq "$url_regex"; then
+             errors+=("音乐签名地址 '$music_url' 格式不正确")
+        fi
+
+        # --- 处理验证结果 ---
+        if [[ ${#errors[@]} -gt 0 ]]; then
+            # 错误标题用红色，错误项用黄色
+            local error_msg="${FG_RED}输入无效:${RESET}\n\n"
+            for error in "${errors[@]}"; do
+                error_msg+=" - ${FG_YELLOW}$error${RESET}\n"
+            done
+            dialog --colors --msgbox "$error_msg" 15 70
+            # 保留用户输入以便下次显示
+            current_music_url="$music_url" # 保留可能无效的URL，让用户修改
+            [[ "$enable_local" == true ]] && current_enable_local_file="on" || current_enable_local_file="off"
+            [[ "$parse_mult" == true ]] && current_parse_mult_msg="on" || current_parse_mult_msg="off"
+            continue # 返回循环，重新显示表单
+        fi
+
+        # --- 验证通过，准备更新 JSON ---
+        # 注意：这里我们直接修改根级别的字段，不需要构建嵌套对象
+
+        # --- 更新 JSON 文件 ---
+        # 使用 jq 直接修改根级别字段
+        # --argjson 用于传递布尔值
+        if jq \
+            --arg musicUrl "$music_url" \
+            --argjson enableLocal "$enable_local" \
+            --argjson parseMult "$parse_mult" \
+            '.musicSignUrl = $musicUrl | .enableLocalFile2Url = $enableLocal | .parseMultMsg = $parseMult' \
+            "$config_file" > "$temp_file" 2> "$jq_stderr_file"; then
+            # 检查写入临时文件是否成功且内容不为空
+            if [[ -s "$temp_file" ]]; then
+                 # 备份原始文件 (可选但推荐)
+                 # cp "$config_file" "$config_file.bak"
+                 # 用临时文件覆盖原始文件
+                 if mv "$temp_file" "$config_file"; then
+                     dialog --colors --msgbox "${FG_GREEN}音乐签名配置已成功更新！${RESET}" 8 50
+                     # 成功后不再需要 trap，清理错误文件
+                     rm -f "$jq_stderr_file"
+                     trap - EXIT
+                     return 0 # 成功退出函数
+                 else
+                     dialog --colors --msgbox "${FG_RED}错误：${RESET}无法更新配置文件 '$config_file'。权限问题？" 8 60
+                     # 出错也清理错误文件
+                     rm -f "$jq_stderr_file"
+                     return 1 # 失败退出函数
+                 fi
+            else
+                 # jq 成功执行但输出了空文件，这通常是 jq 脚本逻辑问题
+                 local jq_error_output=$(<"$jq_stderr_file") # 读取 jq 的 stderr
+                 dialog --colors --msgbox "${FG_RED}错误：${RESET}jq 处理后生成了空文件。请检查 jq 脚本和输入。\n\nJQ 输出(空):\n\n${FG_RED}JQ 错误:${RESET}\n$jq_error_output" 15 70
+                 rm -f "$jq_stderr_file"
+                 return 1 # 失败退出函数
+            fi
+        else
+            # jq 命令执行失败
+            local jq_error_output=$(<"$jq_stderr_file") # 读取 jq 的 stderr
+            rm -f "$jq_stderr_file"
+            dialog --colors --msgbox "${FG_RED}错误：${RESET}使用 jq 更新 JSON 时出错。\n\n${FG_RED}JQ 错误:${RESET}\n$jq_error_output\n\n请检查 JSON 文件格式或 jq 命令。" 15 70
+            return 1 # 失败退出函数
+        fi
+
+        # 理论上不应执行到这里，因为上面有 return，但为保险起见加上 break
+        break
+    done
+}
 # 函数：获取有效的QQ账号列表
 get_qq_accounts() {
     local accounts=()
@@ -1253,15 +1393,23 @@ show_service_menu() {
             ws_client_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
+        # 检查音乐签名配置状态
+        local music_sig_status="${FG_RED}(未配置)${RESET}"
+        if [[ $(jq '.musicSignUrl // ""' "$config_file" 2>/dev/null) != '""' ]]; then
+             music_sig_status="${FG_GREEN}(已配置)${RESET}"
+        fi
+
         # 显示菜单，包含配置状态和帮助选项
-        SERVICE_CHOICE=$(dialog --colors --clear --backtitle "网络服务配置" \
-                                --title "配置 $qq_account 的网络服务" \
-                                --menu "请选择要配置的服务类型:" 18 75 5 \
+        SERVICE_CHOICE=$(dialog --colors --clear --backtitle "服务配置" \
+                                --title "配置 $qq_account 的服务" \
+                                --menu "请选择要配置的项目:" 20 75 7 \
                                 1 "HTTP 服务端 (正向http) ${http_server_status}" \
                                 2 "HTTP 客户端 (反向http) ${http_client_status}" \
                                 3 "WebSocket 服务端 (正向ws) ${ws_server_status}" \
                                 4 "WebSocket 客户端 (反向ws) ${ws_client_status}" \
-                                HELP "我该如何选择？" \
+                                5 "音乐签名配置 ${music_sig_status}" \
+                                6 "WebUI 配置 ${FG_YELLOW}(待实现)${RESET}" \
+                                HELP "我该如何选择网络服务？" \
                                 2>&1 >/dev/tty)
 
         local exit_status=$?
@@ -1284,6 +1432,12 @@ show_service_menu() {
                 ;;
             4)
                 configure_reverse_ws_client "$qq_account"
+                ;;
+            5)
+                configure_music_signature "$qq_account" # 新增调用
+                ;;
+            6)
+                dialog --colors --msgbox "${FG_YELLOW}WebUI 配置功能尚未实现。${RESET}" 6 40 # 新增占位符
                 ;;
             HELP)
                 # 定义帮助信息，使用简化颜色代码
@@ -1341,7 +1495,7 @@ while true; do
 
     CHOICE=$(dialog --colors --clear --backtitle "QQ账号管理" \
                     --title "选择QQ账号" \
-                    --menu "请选择一个账号进行配置，或添加新账号:" \
+                    --menu "请选择一个账号进行服务配置，或添加新账号:" \
                     "$menu_height" 55 "$list_height" \
                     "${MENU_ITEMS[@]}" \
                     2>&1 >/dev/tty)
