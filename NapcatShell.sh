@@ -329,19 +329,19 @@ get_napcat_status() {
     local cmdline=""
     local qq_account=""
     if [[ ! -f "$pid_file" ]] || [[ ! -r "$pid_file" ]]; then
-        echo -e "${FG_YELLOW}未运行${RESET}"
+        echo -e "${FG_YELLOW}未运行😴${RESET}"
         return 0
     fi
     pid=$(cat "$pid_file")
     if [[ -z "$pid" ]] || ! sudo kill -0 "$pid" 2>/dev/null; then
-        echo -e "${FG_YELLOW}未运行${RESET}"
+        echo -e "${FG_YELLOW}未运行😴${RESET}"
         # sudo rm -f "$pid_file" 2>/dev/null # 可选清理
         return 0
     fi
     cmdline=$(ps -o cmd= -p "$pid" 2>/dev/null)
     if [[ "$cmdline" =~ .*-q[[:space:]]+([0-9]{4,}) ]]; then
         qq_account="${BASH_REMATCH[1]}"
-        echo -e "${FG_GREEN}运行中 - ${BOLD}$qq_account${RESET}"
+        echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
         return 0
     else
         # 尝试查找子进程 (更健壮的方式)
@@ -351,12 +351,12 @@ get_napcat_status() {
             # 查找包含 qq 和 -q 参数的子进程命令行
             if [[ "$child_cmdline" =~ qq.*-q[[:space:]]+([0-9]{4,}) ]]; then
                  qq_account="${BASH_REMATCH[1]}"
-                 echo -e "${FG_GREEN}运行中 - ${BOLD}$qq_account${RESET}"
+                 echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
                  return 0
             fi
         done
         # 如果主进程和子进程都没找到有效信息
-        echo -e "${FG_RED}状态未知 (PID: ${BOLD}$pid${RESET})${RESET}"
+        echo -e "${FG_RED}状态未知🤔 (PID: ${BOLD}$pid${RESET})${RESET}"
         return 0
     fi
 }
@@ -437,7 +437,7 @@ while true; do
 
     # 显示菜单
     CHOICE=$(dialog --colors --clear --backtitle "Napcat Shell 主菜单" \
-                    --title "NapcatShell" \
+                    --title "🌟 NapcatShell 🌟" \
                     --ok-label "选择" \
                     --cancel-label "退出" \
                     --menu "\n更新状态: ${update_display_status}\n运行状态: ${NAPCAT_STATUS}\n\n请选择操作:" \

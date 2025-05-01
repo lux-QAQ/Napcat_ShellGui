@@ -116,57 +116,36 @@ get_napcat_status() {
     local pid=""
     local cmdline=""
     local qq_account=""
-
-    # 1. 检查 PID 文件和进程是否存在
     if [[ ! -f "$pid_file" ]] || [[ ! -r "$pid_file" ]]; then
-        echo -e "${FG_YELLOW}未运行${RESET}" # 改为黄色，红色可能过于刺眼
+        echo -e "${FG_YELLOW}未运行😴${RESET}"
         return 0
     fi
-
     pid=$(cat "$pid_file")
-
     if [[ -z "$pid" ]] || ! sudo kill -0 "$pid" 2>/dev/null; then
-        # PID 文件存在但 PID 为空或进程不存在
-        echo -e "${FG_YELLOW}未运行${RESET}"
-        # 可选：清理无效的 PID 文件
-        # sudo rm -f "$pid_file" 2>/dev/null
+        echo -e "${FG_YELLOW}未运行😴${RESET}"
+        # sudo rm -f "$pid_file" 2>/dev/null # 可选清理
         return 0
     fi
-
-    # 2. 进程存在，尝试获取命令行并提取 QQ 账号
-    # 使用 ps 获取命令行，-o cmd= 只输出命令，-p 指定 PID
-    # 注意：这可能获取到 sudo 命令本身，或 xvfb-run 命令，或 qq 命令，取决于进程树和 ps 的行为
-    # 尝试获取 qq 进程的命令行，它是 xvfb-run 的子进程
-    # pgrep -P $pid 可以查找子进程，但 xvfb-run 可能创建更复杂的进程结构
-    # 更可靠的方式是检查启动脚本记录的 PID 对应的命令，或者直接查找包含 -q 参数的 qq 进程
-    # 这里我们先尝试直接从记录的 PID 获取命令，如果失败则尝试查找
     cmdline=$(ps -o cmd= -p "$pid" 2>/dev/null)
-
-    # 尝试从命令行中提取 QQ 账号 (匹配 -q 后面的数字)
     if [[ "$cmdline" =~ .*-q[[:space:]]+([0-9]{4,}) ]]; then
         qq_account="${BASH_REMATCH[1]}"
-        echo -e "${FG_GREEN}运行中 - ${FG_BOLD}$qq_account${RESET}"
+        echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
         return 0
     else
-        # 如果从主 PID 没找到，尝试查找可能的 qq 子进程
-        # 这部分逻辑比较复杂且可能不可靠，取决于 xvfb-run 的具体实现
-        # 简化处理：如果主 PID 命令不包含有效 -q 参数，则认为状态未知
-        echo -e "${FG_RED}处于未知的运行状态 (PID: ${FG_BOLD}$pid${RESET})${RESET}"
+        # 尝试查找子进程 (更健壮的方式)
+        local child_pids=$(pgrep -P "$pid")
+        for child_pid in $child_pids; do
+            child_cmdline=$(ps -o cmd= -p "$child_pid" 2>/dev/null)
+            # 查找包含 qq 和 -q 参数的子进程命令行
+            if [[ "$child_cmdline" =~ qq.*-q[[:space:]]+([0-9]{4,}) ]]; then
+                 qq_account="${BASH_REMATCH[1]}"
+                 echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
+                 return 0
+            fi
+        done
+        # 如果主进程和子进程都没找到有效信息
+        echo -e "${FG_RED}状态未知🤔 (PID: ${BOLD}$pid${RESET})${RESET}"
         return 0
-        # --- 备选：更复杂的子进程查找逻辑 ---
-        # local child_pids=$(pgrep -P "$pid")
-        # for child_pid in $child_pids; do
-        #     child_cmdline=$(ps -o cmd= -p "$child_pid" 2>/dev/null)
-        #     if [[ "$child_cmdline" =~ qq.*-q[[:space:]]+([0-9]{4,}) ]]; then
-        #          qq_account="${BASH_REMATCH[1]}"
-        #          echo -e "${FG_GREEN}运行中 - $qq_account${RESET}"
-        #          return 0
-        #     fi
-        # done
-        # # 如果子进程也没找到
-        # echo -e "${FG_RED}处于未知的运行状态 (PID: $pid)${RESET}"
-        # return 0
-        # --- 备选结束 ---
     fi
 }
 
