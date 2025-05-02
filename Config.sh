@@ -153,12 +153,12 @@ configure_http_server() {
         local host=$(echo "$form_values" | sed -n '2p')
         local port=$(echo "$form_values" | sed -n '3p')
         local token=$(echo "$form_values" | sed -n '4p')
-
+        local msg_format_choice
         # 2. 消息格式选择
         exec 3>&1
-        local msg_format_choice=$(dialog --colors --clear --backtitle "HTTP 服务端配置" \
+        msg_format_choice=$(dialog --colors --clear --backtitle "HTTP 服务端配置" \
             --title "选择消息格式 - $qq_account" \
-            --radiolist "请选择上报消息格式:" 10 40 2 \
+            --radiolist "请选择上报消息格式:(空格来选中/取消)" 10 40 2 \
             "array"  "数组格式" $([[ "$current_msg_format" == "array" ]] && echo "on" || echo "off") \
             "string" "字符串格式" $([[ "$current_msg_format" == "string" ]] && echo "on" || echo "off") \
         2>&1 1>&3)
@@ -171,12 +171,12 @@ configure_http_server() {
             return 1
         fi
         local msg_format="$msg_format_choice" # radiolist 直接返回选中的 tag
-
+        local checklist_choices
         # 3. 开关选择
         exec 3>&1
-        local checklist_choices=$(dialog --colors --clear --backtitle "HTTP 服务端配置" \
+        checklist_choices=$(dialog --colors --clear --backtitle "HTTP 服务端配置" \
             --title "启用选项 - $qq_account" \
-            --checklist "请选择要启用的选项:" 15 50 4 \
+            --checklist "请选择要启用的选项:(空格来选中/取消)" 15 50 4 \
             "enable"    "启用服务"      "$current_enable" \
             "debug"     "开启Debug"     "$current_debug" \
             "cors"      "启用CORS"      "$current_cors" \
@@ -427,12 +427,12 @@ configure_reverse_http_client() {
         local name=$(echo "$form_values" | sed -n '1p')
         local url=$(echo "$form_values" | sed -n '2p')
         local token=$(echo "$form_values" | sed -n '3p')
-
+        local msg_format_choice
         # 2. 消息格式选择
         exec 3>&1
-        local msg_format_choice=$(dialog --colors --clear --backtitle "HTTP 客户端配置" \
+        msg_format_choice=$(dialog --colors --clear --backtitle "HTTP 客户端配置" \
             --title "选择消息格式 - $qq_account" \
-            --radiolist "请选择上报消息格式:" 10 40 2 \
+            --radiolist "请选择上报消息格式:(空格来选中/取消)" 10 40 2 \
             "array"  "数组格式" $([[ "$current_msg_format" == "array" ]] && echo "on" || echo "off") \
             "string" "字符串格式" $([[ "$current_msg_format" == "string" ]] && echo "on" || echo "off") \
         2>&1 1>&3)
@@ -445,12 +445,12 @@ configure_reverse_http_client() {
             return 1
         fi
         local msg_format="$msg_format_choice"
-
+        local checklist_choices
         # 3. 开关选择
         exec 3>&1
-        local checklist_choices=$(dialog --colors --clear --backtitle "HTTP 客户端配置" \
+        checklist_choices=$(dialog --colors --clear --backtitle "HTTP 客户端配置" \
             --title "启用选项 - $qq_account" \
-            --checklist "请选择要启用的选项:" 15 50 3 \
+            --checklist "请选择要启用的选项:(空格来选中/取消)" 15 50 3 \
             "enable"      "启用服务"        "$current_enable" \
             "debug"       "开启Debug"       "$current_debug" \
             "report_self" "上报自身消息"    "$current_report_self" \
@@ -678,12 +678,12 @@ configure_ws_server() {
         local port=$(echo "$form_values" | sed -n '3p')
         local heart_interval=$(echo "$form_values" | sed -n '4p')
         local token=$(echo "$form_values" | sed -n '5p')
-
+        local msg_format_choice
         # 2. 消息格式选择
         exec 3>&1
-        local msg_format_choice=$(dialog --colors --clear --backtitle "WebSocket 服务端配置" \
+        msg_format_choice=$(dialog --colors --clear --backtitle "WebSocket 服务端配置" \
             --title "选择消息格式 - $qq_account" \
-            --radiolist "请选择上报消息格式:" 10 40 2 \
+            --radiolist "请选择上报消息格式:(空格来选中/取消)" 10 40 2 \
             "array"  "数组格式" $([[ "$current_msg_format" == "array" ]] && echo "on" || echo "off") \
             "string" "字符串格式" $([[ "$current_msg_format" == "string" ]] && echo "on" || echo "off") \
         2>&1 1>&3)
@@ -696,12 +696,12 @@ configure_ws_server() {
             return 1
         fi
         local msg_format="$msg_format_choice"
-
+        local checklist_choices
         # 3. 开关选择
         exec 3>&1
-        local checklist_choices=$(dialog --colors --clear --backtitle "WebSocket 服务端配置" \
+        checklist_choices=$(dialog --colors --clear --backtitle "WebSocket 服务端配置" \
             --title "启用选项 - $qq_account" \
-            --checklist "请选择要启用的选项:" 15 50 4 \
+            --checklist "请选择要启用的选项:(空格来选中/取消)" 15 50 4 \
             "enable"      "启用服务"        "$current_enable" \
             "debug"       "开启Debug"       "$current_debug" \
             "report_self" "上报自身消息"    "$current_report_self" \
@@ -947,12 +947,12 @@ configure_reverse_ws_client() {
         local heart_interval=$(echo "$form_values" | sed -n '3p')
         local reconnect_interval=$(echo "$form_values" | sed -n '4p')
         local token=$(echo "$form_values" | sed -n '5p')
-
+        local msg_format_choice
         # 2. 消息格式选择
         exec 3>&1
-        local msg_format_choice=$(dialog --colors --clear --backtitle "WebSocket 客户端配置" \
+        msg_format_choice=$(dialog --colors --clear --backtitle "WebSocket 客户端配置" \
             --title "选择消息格式 - $qq_account" \
-            --radiolist "请选择上报消息格式:" 10 40 2 \
+            --radiolist "请选择上报消息格式:(空格来选中/取消)" 10 40 2 \
             "array"  "数组格式" $([[ "$current_msg_format" == "array" ]] && echo "on" || echo "off") \
             "string" "字符串格式" $([[ "$current_msg_format" == "string" ]] && echo "on" || echo "off") \
         2>&1 1>&3)
@@ -965,12 +965,12 @@ configure_reverse_ws_client() {
             return 1
         fi
         local msg_format="$msg_format_choice"
-
+        local checklist_choices
         # 3. 开关选择
         exec 3>&1
-        local checklist_choices=$(dialog --colors --clear --backtitle "WebSocket 客户端配置" \
+        checklist_choices=$(dialog --colors --clear --backtitle "WebSocket 客户端配置" \
             --title "启用选项 - $qq_account" \
-            --checklist "请选择要启用的选项:" 15 50 3 \
+            --checklist "请选择要启用的选项:(空格来选中/取消)" 15 50 3 \
             "enable"      "启用服务"        "$current_enable" \
             "debug"       "开启Debug"       "$current_debug" \
             "report_self" "上报自身消息"    "$current_report_self" \
@@ -1173,12 +1173,12 @@ configure_music_signature() {
 
         # 解析表单输入
         local music_url=$(echo "$form_values" | sed -n '1p')
-
+        local checklist_choices
         # 2. 开关选择
         exec 3>&1
-        local checklist_choices=$(dialog --colors --clear --backtitle "音乐签名配置" \
+        checklist_choices=$(dialog --colors --clear --backtitle "音乐签名配置" \
             --title "启用选项 - $qq_account" \
-            --checklist "请选择要启用的选项:" 15 60 2 \
+            --checklist "请选择要启用的选项:(空格来选中/取消)" 15 60 2 \
             "enable_local" "启用本地文件到URL" "$current_enable_local_file" \
             "parse_mult"   "启用上报解析合并消息" "$current_parse_mult_msg" \
         2>&1 1>&3)
@@ -1364,7 +1364,21 @@ configure_webui() {
         if [[ "$port" =~ ^[0-9]+$ ]] && [[ "$port" -ge 1 ]] && [[ "$port" -le 65535 ]]; then
             # 检查 TCP 监听端口
             if ss -tuln | grep -q ":${port}\s"; then
-                 errors+=("端口 $port 可能已被占用")
+                # 端口正在监听。尝试用 curl 访问 localhost:<port> 检查是否是运行中的 WebUI
+                local curl_host="127.0.0.1" # 总是检查 localhost
+                local http_code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 2 "http://${curl_host}:${port}")
+                local curl_exit_status=$? # 获取 curl 的退出状态码
+
+                # 如果 curl 命令执行失败 (例如，连接被拒绝 - 退出码 7, 超时 - 退出码 28)
+                # 或者 curl 成功但 HTTP 状态码是 000 (通常也表示连接层失败)
+                if [[ $curl_exit_status -ne 0 ]] || [[ "$http_code" == "000" ]]; then
+                    # 端口在监听，但无法通过 curl 访问预期的 WebUI 服务，认为端口被其他程序占用
+                    errors+=("端口 $port 已被占用 (无法访问预期的 WebUI 服务)")
+                # else
+                    # 端口在监听，并且 curl 成功获取了 HTTP 响应 (即使是 4xx 或 5xx)
+                    # 这表明很可能是正在运行的 WebUI 实例，允许用户继续配置（可能用于修改现有配置）
+                    # 不添加错误信息
+                fi
             fi
         fi
 
@@ -1570,6 +1584,203 @@ add_account() {
     done
 }
 
+
+
+
+# 配置开机自启动
+configure_autostart() {
+    local qq_account=$1
+    local init_script_name="nc_${qq_account}" # init.d 脚本名称
+    local init_script_dir="/etc/init.d"
+    local init_script_file="${init_script_dir}/${init_script_name}"
+    local qq_exec_path="qq" # !! 确保这是正确的 QQ 可执行文件路径 !!
+    # 构建执行命令 (无 sudo, 无后台符, 无手动重定向) - 将在 init 脚本内部使用
+    # local exec_command="/usr/bin/xvfb-run -a ${qq_exec_path} --no-sandbox -q ${qq_account}"
+    local log_file="/var/log/napcat_${qq_account}.log"
+    local pid_file="/var/run/napcat.pid" # 单一 PID 文件
+    # 工作目录，root 通常是 /root
+    local work_dir="/root"
+    # 指定 PATH 环境变量，供 init 脚本使用
+    local service_path_env="PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin"
+
+    # 检查 init.d 目录是否存在
+    if [[ ! -d "$init_script_dir" ]]; then
+        dialog --colors --msgbox "${FG_RED}错误：${RESET}init.d 目录 '$init_script_dir' 不存在。" 8 60
+        return 1
+    fi
+
+    # 检查 update-rc.d 命令是否存在
+    if ! command -v update-rc.d &> /dev/null; then
+         dialog --colors --msgbox "${FG_RED}错误：${RESET}命令 'update-rc.d' 未找到。\n无法管理 SysVinit 启动脚本。" 8 60
+         return 1
+    fi
+
+    # --- 1. 检查当前账号的自启动脚本是否已存在 ---
+    # SysVinit 通常通过检查 /etc/rc*.d/ 中的符号链接来判断是否启用，但 update-rc.d 管理更可靠
+    # 这里我们简化为检查 init.d 文件是否存在，因为 update-rc.d remove 会删除它
+    if [[ -f "$init_script_file" ]]; then
+        dialog --colors --title "取消自启动" --yesno "账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 已配置开机自启动 (init.d脚本)。\n\n是否要取消该账号的开机自启动？" 10 70 2>&1 >/dev/tty
+        local choice=$?
+        clear
+        if [[ $choice -eq 0 ]]; then # Yes - 取消自启动
+            echo "正在禁用并移除 $init_script_name ..."
+            # 尝试从运行级别中移除，然后删除文件
+            if sudo update-rc.d -f "$init_script_name" remove &> /dev/null && sudo rm -f "$init_script_file"; then
+                # update-rc.d remove 应该会处理符号链接，无需手动 daemon-reload
+                dialog --colors --msgbox "账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 的开机自启动已成功取消。" 8 50
+            else
+                # 如果 update-rc.d 失败，尝试仅删除文件
+                if sudo rm -f "$init_script_file"; then
+                     dialog --colors --msgbox "${FG_YELLOW}警告：${RESET}update-rc.d 移除失败，但启动脚本文件已删除。\n可能需要手动清理 /etc/rc*.d/ 中的链接。" 10 70
+                else
+                     dialog --colors --msgbox "${FG_RED}错误：${RESET}取消自启动失败。请检查权限或手动操作。" 8 60
+                fi
+            fi
+        else # No - 保留
+            dialog --colors --msgbox "操作已取消，保留现有自启动配置。" 6 50
+        fi
+        return 0 # 无论成功与否，处理完毕
+    fi
+
+    # --- 2. 检查是否存在其他账号的自启动脚本 ---
+    # 由于 PID 文件共享，严格来说不允许多个账号同时启用
+    local existing_script_file=""
+    local other_qq=""
+    shopt -s nullglob
+    for file in "$init_script_dir"/nc_*; do
+        # 跳过非脚本文件或目录等
+        [[ ! -x "$file" ]] || [[ ! -f "$file" ]] && continue
+        local filename=$(basename "$file")
+        # 提取 QQ 号
+        if [[ "$filename" =~ nc_([0-9]+) ]] && [[ "${BASH_REMATCH[1]}" != "$qq_account" ]]; then
+            # 简单地假设文件存在即为已配置（因为上一步会处理当前账号的取消）
+            existing_script_file="$file"
+            other_qq="${BASH_REMATCH[1]}"
+            break # 只处理找到的第一个冲突
+        fi
+    done
+    shopt -u nullglob
+
+    if [[ -n "$existing_script_file" ]]; then
+        local existing_script_name=$(basename "$existing_script_file")
+        local conflict_choice
+        exec 3>&1
+        conflict_choice=$(dialog --colors --clear --backtitle "自启动冲突" \
+            --title "检测到冲突" \
+            --menu "已存在账号 ${BOLD}${FG_CYAN}$other_qq${RESET} 的开机自启动脚本 (${existing_script_name})。\n由于使用共享 PID 文件，不建议同时启用多个。\n请选择操作:" 16 75 3 \
+            1 "替换 (禁用 $other_qq, 启用 $qq_account)" \
+            2 "取消添加 $qq_account" \
+            3 "强制添加 $qq_account (强烈不推荐!)" \
+        2>&1 1>&3)
+        local conflict_exit_status=$?
+        exec 3>&-
+        clear
+
+        if [[ $conflict_exit_status -ne 0 ]]; then
+            dialog --colors --msgbox "操作已取消。" 6 40
+            return 1
+        fi
+
+        case "$conflict_choice" in
+            1) # 替换
+                echo "正在禁用并移除旧脚本 $existing_script_name ..."
+                if ! (sudo update-rc.d -f "$existing_script_name" remove &> /dev/null && sudo rm -f "$existing_script_file"); then
+                     # 尝试仅删除文件作为后备
+                     if ! sudo rm -f "$existing_script_file"; then
+                         dialog --colors --msgbox "${FG_RED}错误：${RESET}禁用或移除旧脚本 '$existing_script_name' 失败。\n请检查权限或手动操作后重试。" 10 70
+                         return 1
+                     else
+                         echo -e "${ANSI_YELLOW}警告：${ANSI_RESET}update-rc.d 移除旧脚本失败，但文件已删除。"
+                     fi
+                fi
+                echo "旧脚本已移除，继续添加新脚本..."
+                ;;
+            2) # 取消
+                dialog --colors --msgbox "添加账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 的自启动已取消。" 6 50
+                return 1
+                ;;
+            3) # 强制添加
+                dialog --colors --infobox "${FG_YELLOW}警告：${RESET}强制添加多个自启动脚本，极可能导致 PID 文件冲突和管理混乱！" 6 70
+                sleep 3
+                ;;
+            *) # 无效选择或意外情况
+                dialog --colors --msgbox "无效的选择。" 6 40
+                return 1
+                ;;
+        esac
+    fi
+
+    # --- 3. 添加新的自启动脚本 ---
+    echo -e "正在为账号 ${ANSI_BOLD}${ANSI_CYAN}$qq_account${ANSI_RESET} 创建开机自启动脚本..."
+
+    # 创建 init.d 脚本内容并直接写入文件
+    # 使用 cat <<EOF，内部的 ${qq_account} 会被展开，而 \$ 开头的变量需要转义以防止展开
+    sudo cat <<EOF > "$init_script_file"
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:          nc_${qq_account}
+# Required-Start:    \$network \$remote_fs \$syslog
+# Required-Stop:     \$network \$remote_fs \$syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Manage nc_${qq_account} service
+# Description:       Start of nc_${qq_account} service.
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:bin:/usr/sbin:/usr/bin
+CMD="sudo /usr/bin/xvfb-run -a qq --no-sandbox -q ${qq_account}"
+PID_FILE="/var/run/napcat.pid"
+LOG_FILE="/var/log/napcat_${qq_account}.log"
+
+start() {
+    touch "\$PID_FILE"
+    exec \$CMD >> "\$LOG_FILE" 2>&1 &
+    echo \$! > "\$PID_FILE"
+    echo "nc sucess"
+}
+
+case "\$1" in
+    start)
+        start
+        ;;
+    *)
+        exit 1
+        ;;
+esac
+
+exit 0
+EOF
+    if [[ $? -ne 0 ]]; then
+        dialog --colors --msgbox "${FG_RED}错误：${RESET}无法创建启动脚本 '$init_script_file'。\n请检查权限。" 8 60
+        return 1
+    fi
+
+    # 设置脚本权限为可执行
+    sudo chmod +x "$init_script_file"
+    if [[ $? -ne 0 ]]; then
+        dialog --colors --msgbox "${FG_RED}错误：${RESET}无法设置启动脚本 '$init_script_file' 为可执行。\n请检查权限。" 8 60
+        # 清理已创建的文件
+        sudo rm -f "$init_script_file"
+        return 1
+    fi
+
+    # 使用 update-rc.d 添加到默认运行级别
+    echo "正在启用启动脚本 $init_script_name ..."
+    sudo chmod +x /etc/init.d/nc_${qq_account}
+    sudo update-rc.d nc_${qq_account} defaults
+    if sudo update-rc.d "$init_script_name" defaults; then
+        dialog --colors --msgbox "账号 ${BOLD}${FG_CYAN}$qq_account${RESET} 的开机自启动已成功配置！\n脚本将在下次系统启动时运行。\n日志文件: ${log_file}\nPID 文件: ${pid_file}" 13 70
+        return 0
+    else
+        dialog --colors --msgbox "${FG_RED}错误：${RESET}启用启动脚本 '$init_script_name' 失败 (update-rc.d)。\n请检查脚本内容或系统日志。" 10 70
+        # 清理失败时创建的文件
+        sudo rm -f "$init_script_file"
+        # 尝试移除 (以防万一 defaults 创建了部分链接)
+        sudo update-rc.d -f "$init_script_name" remove &> /dev/null
+        return 1
+    fi
+}
+
 # 函数：显示网络服务配置菜单 (菜单2)
 show_service_menu() {
     local qq_account=$1 # 虽然 WebUI 配置不直接用 qq_account，但保持函数签名一致
@@ -1583,61 +1794,103 @@ show_service_menu() {
             return # 返回到账号选择菜单
         fi
 
-        # --- 检查各项服务的配置状态 ---
-        local http_server_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.httpServers // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
-            http_server_status="${FG_GREEN}(已配置)${RESET}"
+        # --- 检查各项服务的配置状态和启用状态 ---
+
+        # HTTP Server
+        local http_server_config_status="${FG_RED}(未配置)${RESET}"
+        local http_server_enable_status=""
+        local http_server_config=$(jq -c '.network.httpServers[0] // null' "$onebot_config_file" 2>/dev/null)
+        if [[ "$http_server_config" != "null" ]]; then
+            http_server_config_status="${FG_GREEN}(已配置)${RESET}"
+            if [[ $(echo "$http_server_config" | jq -r '.enable // false') == "true" ]]; then
+                http_server_enable_status="${FG_GREEN}(已启用)${RESET}"
+            else
+                http_server_enable_status="${FG_RED}(未启用)${RESET}"
+            fi
         fi
 
-        local http_client_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.httpClients // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
-            http_client_status="${FG_GREEN}(已配置)${RESET}"
+        # HTTP Client
+        local http_client_config_status="${FG_RED}(未配置)${RESET}"
+        local http_client_enable_status=""
+        local http_client_config=$(jq -c '.network.httpClients[0] // null' "$onebot_config_file" 2>/dev/null)
+        if [[ "$http_client_config" != "null" ]]; then
+            http_client_config_status="${FG_GREEN}(已配置)${RESET}"
+            if [[ $(echo "$http_client_config" | jq -r '.enable // false') == "true" ]]; then
+                http_client_enable_status="${FG_GREEN}(已启用)${RESET}"
+            else
+                http_client_enable_status="${FG_RED}(未启用)${RESET}"
+            fi
         fi
 
-        local ws_server_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.websocketServers // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
-            ws_server_status="${FG_GREEN}(已配置)${RESET}"
+        # WebSocket Server
+        local ws_server_config_status="${FG_RED}(未配置)${RESET}"
+        local ws_server_enable_status=""
+        local ws_server_config=$(jq -c '.network.websocketServers[0] // null' "$onebot_config_file" 2>/dev/null)
+        if [[ "$ws_server_config" != "null" ]]; then
+            ws_server_config_status="${FG_GREEN}(已配置)${RESET}"
+            if [[ $(echo "$ws_server_config" | jq -r '.enable // false') == "true" ]]; then
+                ws_server_enable_status="${FG_GREEN}(已启用)${RESET}"
+            else
+                ws_server_enable_status="${FG_RED}(未启用)${RESET}"
+            fi
         fi
 
-        local ws_client_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '(.network.websocketClients // []) | length' "$onebot_config_file" 2>/dev/null) -gt 0 ]]; then
-            ws_client_status="${FG_GREEN}(已配置)${RESET}"
+        # WebSocket Client
+        local ws_client_config_status="${FG_RED}(未配置)${RESET}"
+        local ws_client_enable_status=""
+        local ws_client_config=$(jq -c '.network.websocketClients[0] // null' "$onebot_config_file" 2>/dev/null)
+        if [[ "$ws_client_config" != "null" ]]; then
+            ws_client_config_status="${FG_GREEN}(已配置)${RESET}"
+            if [[ $(echo "$ws_client_config" | jq -r '.enable // false') == "true" ]]; then
+                ws_client_enable_status="${FG_GREEN}(已启用)${RESET}"
+            else
+                ws_client_enable_status="${FG_RED}(未启用)${RESET}"
+            fi
         fi
 
+        # Music Signature (只有配置状态)
         local music_sig_status="${FG_RED}(未配置)${RESET}"
-        if [[ $(jq '.musicSignUrl // ""' "$onebot_config_file" 2>/dev/null) != '""' ]]; then
+        # Check if the key exists, is not null, AND is not an empty string.
+        if jq -e 'has("musicSignUrl") and (.musicSignUrl != null) and (.musicSignUrl != "")' "$onebot_config_file" >/dev/null 2>&1; then
              music_sig_status="${FG_GREEN}(已配置)${RESET}"
         fi
 
-        # 检查 WebUI 配置状态
+        # Autostart (只有启用状态)
+        local autostart_script_name="nc_${qq_account}"
+        local autostart_script_file="/etc/init.d/${autostart_script_name}"
+        local autostart_status="${FG_RED}(未启用)${RESET}"
+        if [[ -f "$autostart_script_file" ]]; then
+             autostart_status="${FG_GREEN}(已启用)${RESET}"
+        fi
+
+        # WebUI (只有配置状态，基于 token)
         local webui_status="${FG_RED}(未配置)${RESET}"
         if [[ -f "$webui_config_file" ]] && [[ -r "$webui_config_file" ]]; then
             local webui_token=$(jq -r '.token // ""' "$webui_config_file" 2>/dev/null)
             if [[ "$webui_token" == "napcat" ]]; then
-                webui_status="${FG_RED}(使用默认token，有安全隐患)${RESET}"
-            elif [[ -n "$webui_token" ]]; then # 如果 token 不是 napcat 且不为空
+                webui_status="${FG_RED}(使用默认token)${RESET}" # 简化提示
+            elif [[ -n "$webui_token" ]]; then
                 webui_status="${FG_GREEN}(已配置)${RESET}"
             fi
-            # 如果 token 为空或文件读取失败，则保持 (未配置)
         fi
 
 
-        # 显示菜单，包含配置状态和帮助选项
+        # 显示菜单，包含配置状态和启用状态
         SERVICE_CHOICE=$(dialog --colors --clear --backtitle "服务配置" \
                                 --title "配置 $qq_account 的服务" \
                                 --menu "请选择要配置的项目:" 20 85 7 \
-                                1 "HTTP 服务端 (正向http) ${http_server_status}" \
-                                2 "HTTP 客户端 (反向http) ${http_client_status}" \
-                                3 "WebSocket 服务端 (正向ws) ${ws_server_status}" \
-                                4 "WebSocket 客户端 (反向ws) ${ws_client_status}" \
+                                1 "HTTP 服务端 (正向http) ${http_server_config_status}${http_server_enable_status}" \
+                                2 "HTTP 客户端 (反向http) ${http_client_config_status}${http_client_enable_status}" \
+                                3 "WebSocket 服务端 (正向ws) ${ws_server_config_status}${ws_server_enable_status}" \
+                                4 "WebSocket 客户端 (反向ws) ${ws_client_config_status}${ws_client_enable_status}" \
                                 5 "音乐签名配置 ${music_sig_status}" \
                                 6 "WebUI 配置 ${webui_status}" \
+                                7 "开机自启动 ${autostart_status}" \
                                 HELP "我该如何选择网络服务？" \
                                 2>&1 >/dev/tty)
 
         local exit_status=$?
         clear
-
         if [[ $exit_status -ne 0 ]]; then
             # 用户按了取消或ESC，返回到账号选择菜单
             return
@@ -1657,13 +1910,16 @@ show_service_menu() {
                 configure_reverse_ws_client "$qq_account"
                 ;;
             5)
-                configure_music_signature "$qq_account" # 新增调用
+                configure_music_signature "$qq_account"
                 ;;
             6)
-                configure_webui # 调用新的 WebUI 配置函数
+                configure_webui
+                ;;
+            7) # 新增处理自启动选项
+                configure_autostart "$qq_account"
                 ;;
             HELP)
-                # 定义帮助信息，使用简化颜色代码
+                # ... (help text remains the same) ...
                 local help_text=""
                 help_text+="${BOLD}${FG_GREEN}HTTP 服务端${RESET}\n" # 标题：粗体绿色
                 help_text+="  ${BOLD}${FG_CYAN}NapCat${RESET} 作为 HTTP 服务端，监听并接受 外部 发起的请求，处理后返回响应 (${BOLD}单向${RESET}：外部 -> ${BOLD}${FG_CYAN}NapCat${RESET})。\n\n" # NapCat: 粗体青色, 方向: 粗体
@@ -1673,10 +1929,13 @@ show_service_menu() {
                 help_text+="  ${BOLD}${FG_CYAN}NapCat${RESET} 作为 WebSocket 服务端，与 客户端 保持 ${BOLD}双向${RESET} 长连接，既能被动接收 客户端 消息，也能主动推送事件。(${BOLD}双向${RESET}：${BOLD}${FG_CYAN}NapCat${RESET} <-> 客户端)。\n\n" # NapCat: 粗体青色, 方向: 粗体
                 help_text+="${BOLD}${FG_GREEN}WebSocket 客户端${RESET}\n" # 标题：粗体绿色
                 help_text+="  ${BOLD}${FG_CYAN}NapCat${RESET} 作为 WebSocket 客户端，主动向 外部 WebSocket 服务端 建立 ${BOLD}双向${RESET} 长连接，既能主动发送事件，也能响应 服务端 请求 (${BOLD}双向${RESET}：${BOLD}${FG_CYAN}NapCat${RESET} <-> 服务端)。\n\n\n" # NapCat: 粗体青色, 方向: 粗体
-                help_text+="详细配置请参考：${FG_BLUE}https://napcat.napneko.icu/config/basic${RESET}" # 链接：蓝色
+                help_text+="* ${BOLD}音乐签名配置:${RESET}\n  配置用于获取音乐分享链接签名的 API 地址。\n\n"
+                help_text+="* ${BOLD}WebUI 配置:${RESET}\n  配置 Napcat Web 管理界面的访问参数。\n\n"
+                help_text+="* ${BOLD}开机自启动:${RESET}\n  将当前选择的 QQ 账号配置为随系统启动而自动运行。\n  ${FG_YELLOW}注意：${RESET}通常只应为一个账号启用自启动。"
 
-                # 显示帮助信息
-                dialog --colors --cr-wrap --title "如何选择网络服务？" --msgbox "$help_text"  25 80
+                help_text+="\n\n详细配置请参考：${FG_BLUE}https://napcat.napneko.icu/config/basic${RESET}" # 链接：蓝色
+
+                dialog --colors --cr-wrap --title "如何选择网络服务？" --msgbox "$help_text"  31 100
                 clear # 清理 msgbox 留下的屏幕内容
                 ;;
             *)

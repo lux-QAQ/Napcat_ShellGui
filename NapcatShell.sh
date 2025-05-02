@@ -322,46 +322,76 @@ check_for_update() {
     # --- 比较结束 ---
 }
 
-# 复制 get_napcat_status 函数 (或者理想情况下从共享库加载)
-get_napcat_status() {
+
+_get_napcat_pid_and_account() {
     local pid_file="/var/run/napcat.pid"
     local pid=""
     local cmdline=""
     local qq_account=""
+
     if [[ ! -f "$pid_file" ]] || [[ ! -r "$pid_file" ]]; then
-        echo -e "${FG_YELLOW}未运行😴${RESET}"
-        return 0
+        return 3 # PID 文件问题
     fi
+
     pid=$(cat "$pid_file")
     if [[ -z "$pid" ]] || ! sudo kill -0 "$pid" 2>/dev/null; then
-        echo -e "${FG_YELLOW}未运行😴${RESET}"
         # sudo rm -f "$pid_file" 2>/dev/null # 可选清理
-        return 0
+        return 1 # 未运行
     fi
+
+    # 尝试从主进程命令行获取
     cmdline=$(ps -o cmd= -p "$pid" 2>/dev/null)
     if [[ "$cmdline" =~ .*-q[[:space:]]+([0-9]{4,}) ]]; then
         qq_account="${BASH_REMATCH[1]}"
-        echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
-        return 0
-    else
-        # 尝试查找子进程 (更健壮的方式)
-        local child_pids=$(pgrep -P "$pid")
-        for child_pid in $child_pids; do
-            child_cmdline=$(ps -o cmd= -p "$child_pid" 2>/dev/null)
-            # 查找包含 qq 和 -q 参数的子进程命令行
-            if [[ "$child_cmdline" =~ qq.*-q[[:space:]]+([0-9]{4,}) ]]; then
-                 qq_account="${BASH_REMATCH[1]}"
-                 echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
-                 return 0
-            fi
-        done
-        # 如果主进程和子进程都没找到有效信息
-        echo -e "${FG_RED}状态未知🤔 (PID: ${BOLD}$pid${RESET})${RESET}"
-        return 0
+        echo "$qq_account" # 输出 QQ 账号
+        return 0 # 运行中
     fi
+
+    # 尝试从子进程命令行获取
+    local child_pids=$(pgrep -P "$pid")
+    for child_pid in $child_pids; do
+        child_cmdline=$(ps -o cmd= -p "$child_pid" 2>/dev/null)
+        if [[ "$child_cmdline" =~ qq.*-q[[:space:]]+([0-9]{4,}) ]]; then
+             qq_account="${BASH_REMATCH[1]}"
+             echo "$qq_account" # 输出 QQ 账号
+             return 0 # 运行中
+        fi
+    done
+
+    # 如果都找不到
+    echo "$pid" # 输出 PID 供参考
+    return 2 # 状态未知
 }
 
-# --- 占位符函数 ---
+# 复制 get_napcat_status 函数 (或者理想情况下从共享库加载)
+get_napcat_status() {
+    local status_code
+    local output
+
+    # 调用内部函数，捕获输出和状态码
+    output=$(_get_napcat_pid_and_account)
+    status_code=$?
+
+    case $status_code in
+        0) # 运行中
+            local qq_account="$output"
+            echo -e "${FG_GREEN}运行中😋 - ${BOLD}$qq_account${RESET}"
+            ;;
+        1 | 3) # 未运行 或 PID 文件问题
+            echo -e "${FG_YELLOW}未运行😴${RESET}"
+            ;;
+        2) # 状态未知
+            local pid="$output"
+            echo -e "${FG_RED}状态未知🤔 (PID: ${BOLD}$pid${RESET})${RESET}"
+            ;;
+        *) # 其他未知错误
+             echo -e "${FG_RED}检查状态出错${RESET}"
+             ;;
+    esac
+    # 注意：此函数现在只负责 echo，不返回状态码给调用者
+}
+
+
 stop_napcat() {
     local pid_file="/var/run/napcat.pid"
     local pid=""
@@ -411,7 +441,56 @@ update_napcat() {
     fi
 }
 
+view_log() {
+    local status_code
+    local output
+    local qq_account
+    local log_file
+    local pid
 
+    # 调用内部函数获取状态和账号/PID
+    output=$(_get_napcat_pid_and_account) # 获取状态和输出
+    status_code=$? # 获取退出码
+
+    case $status_code in
+        0) # 运行中 (退出码 0)
+            qq_account="$output" # 输出是 QQ 账号
+            log_file="/var/log/napcat_${qq_account}.log" # 构建日志路径
+
+            # 检查日志文件
+            if [[ ! -f "$log_file" ]] || [[ ! -r "$log_file" ]]; then
+                dialog --colors --title "错误" --msgbox "${FG_RED}无法读取日志文件: ${BOLD}$log_file${RESET}\n\n文件不存在或权限不足。${RESET}" 10 70
+                return 1 # 返回错误
+            fi
+
+            # 清屏并显示提示
+            clear
+            echo -e "${ANSI_GREEN}正在打开日志文件: ${ANSI_BOLD}$log_file${ANSI_RESET}"
+            echo -e "${ANSI_YELLOW}使用 ↑ ↓箭头键 或 PageUp/PageDown 翻页，按 'q' 退出。${ANSI_RESET}"
+            sleep 1.1 # 等待用户阅读提示 (可以考虑缩短为 1 秒)
+
+            # 使用 less 查看日志 (-R 显示颜色, +G 从末尾开始)
+            less -R +G "$log_file"
+
+            # less 退出后清理屏幕
+            clear
+            return 0 # 成功返回
+            ;;
+        1 | 3) # 未运行 (退出码 1) 或 PID 文件问题 (退出码 3)
+            dialog --colors --title "无法查看日志" --msgbox "${FG_RED}Napcat 未运行，请启动后查看日志。${RESET}" 8 60
+            return 1 # 返回错误
+            ;;
+        2) # 状态未知 (退出码 2)
+            pid="$output" # 输出是 PID
+            dialog --colors --title "无法查看日志" --msgbox "${FG_RED}无法确定 Napcat 运行账号 (PID: ${BOLD}$pid${RESET})。\n请检查 Napcat 进程或日志文件命名。${RESET}" 9 70
+            return 1 # 返回错误
+            ;;
+        *) 
+            dialog --colors --title "错误" --msgbox "${FG_RED}检查 Napcat 状态时发生未知错误。${RESET}" 8 60
+            return 1 # 返回错误
+            ;;
+    esac
+}
 # --- 主菜单循环 ---
 while true; do
     # 检查更新
@@ -427,21 +506,23 @@ while true; do
     # 获取运行状态
     NAPCAT_STATUS=$(get_napcat_status)
 
-    # 定义菜单项
+    # 定义菜单项 (添加 LOG)
     MENU_ITEMS=(
         "START"  "启动 Napcat"
         "STOP"   "停止 Napcat"
         "CONFIG" "配置 Napcat"
         "UPDATE" "更新 Napcat"
+        "LOG"    "查看日志"   # 新增日志选项
     )
 
+    # 显示菜单 (调整尺寸和项目数)
     # 显示菜单
     CHOICE=$(dialog --colors --clear --backtitle "Napcat Shell 主菜单" \
                     --title "🌟 NapcatShell 🌟" \
                     --ok-label "选择" \
                     --cancel-label "退出" \
                     --menu "\n更新状态: ${update_display_status}\n运行状态: ${NAPCAT_STATUS}\n\n请选择操作:" \
-                    15 60 4 \
+                    16 60 5 \
                     "${MENU_ITEMS[@]}" \
                     2>&1 >/dev/tty)
 
@@ -470,6 +551,9 @@ while true; do
                     ;;
                 "UPDATE")
                     update_napcat # 调用更新函数
+                    ;;
+                "LOG") # 新增 LOG 分支
+                    view_log # 调用查看日志函数
                     ;;
                 *)
                     dialog --colors --msgbox "无效的选择: '$CHOICE'" 6 40

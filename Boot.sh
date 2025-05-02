@@ -149,7 +149,7 @@ get_napcat_status() {
     fi
 }
 
-# 函数：执行登录 (占位符 - 需要具体实现)
+# 函数：执行登录
 start_napcat_login() {
     local qq_account=$1
     local pid_file="/var/run/napcat.pid"
@@ -397,9 +397,9 @@ while true; do
     clear
 
     case $exit_status in
-        0) # OK - 用户选择了某项
+        0) 
             case "$CHOICE" in
-                "$CONFIG_TAG") # 用户选择了配置选项
+                "$CONFIG_TAG") 
                     # 检查 Config.sh 是否存在且可执行
                     if [[ -f "$CONFIG_SCRIPT" ]] && [[ -x "$CONFIG_SCRIPT" ]]; then
                         "$CONFIG_SCRIPT" # 执行配置脚本
@@ -427,15 +427,14 @@ while true; do
                     ;;
             esac
             ;;
-        1) # Cancel - 用户选择退出
+        1) 
             echo "已退出 Napcat 启动器。"
             break # 退出主循环
             ;;
-        3) # Extra button - 用户选择刷新状态
-            # 不需要做任何事，循环会自动重新获取状态并显示
+        3) 
             continue
             ;;
-        *) # 其他情况 (例如 ESC)
+        *) 
             echo "操作已取消或发生未知错误 (退出码: $exit_status)。"
             break # 退出主循环
             ;;
